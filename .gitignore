@@ -6,6 +6,11 @@
 !/build-aux
 !/cmake
 !/data
+!/deps
+!/docs
+!/examples
+!/include
+!/tests
 !/src
 !.clang-format
 !.gersemirc
