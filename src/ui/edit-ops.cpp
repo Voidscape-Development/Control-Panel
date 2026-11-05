@@ -88,7 +88,7 @@ bool resizeGrid(QWidget *parent, Panel &panel, int rows, int cols)
 	const QStringList affected = grid::cellsAffectedByResize(panel, rows, cols);
 	if (!affected.isEmpty()) {
 		Panel probe = panel;
-		const int removed = grid::resize(probe, rows, cols).size();
+		const int removed = int(grid::resize(probe, rows, cols).size());
 		const QString text = T("Editor.ResizeConfirm").arg(removed).arg(affected.size() - removed);
 		if (QMessageBox::question(parent, T("Editor.ResizeTitle"), text) != QMessageBox::Yes)
 			return false;

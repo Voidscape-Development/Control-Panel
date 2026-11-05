@@ -235,7 +235,7 @@ Cell Cell::fromJson(const QJsonObject &o)
 	c.iconPath = o.value(QStringLiteral("icon")).toString();
 	c.style = Style::fromJson(o.value(QStringLiteral("style")).toObject());
 
-	for (const QJsonValue &v : o.value(QStringLiteral("actions")).toArray()) {
+	for (const QJsonValue v : o.value(QStringLiteral("actions")).toArray()) {
 		Action a = Action::fromJson(v.toObject());
 		if (!a.type.isEmpty())
 			c.actions.append(a);
@@ -319,7 +319,7 @@ Panel Panel::fromJson(const QJsonObject &o)
 	p.collection = o.value(QStringLiteral("collection")).toString();
 	p.showAsDock = o.value(QStringLiteral("showAsDock")).toBool(true);
 	p.showInSwitcher = o.value(QStringLiteral("showInSwitcher")).toBool(true);
-	for (const QJsonValue &v : o.value(QStringLiteral("cells")).toArray())
+	for (const QJsonValue v : o.value(QStringLiteral("cells")).toArray())
 		p.cells.append(Cell::fromJson(v.toObject()));
 	p.hotkeys = o.value(QStringLiteral("hotkeys")).toObject();
 	return p;

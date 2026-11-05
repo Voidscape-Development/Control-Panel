@@ -60,8 +60,8 @@ struct HotkeyRef {
 	static HotkeyRef decode(const QString &s)
 	{
 		HotkeyRef r;
-		const int a = s.indexOf(QLatin1Char('|'));
-		const int b = s.lastIndexOf(QLatin1Char('|'));
+		const qsizetype a = s.indexOf(QLatin1Char('|'));
+		const qsizetype b = s.lastIndexOf(QLatin1Char('|'));
 		if (a < 0 || b <= a)
 			return r;
 		r.type = s.left(a).toInt();

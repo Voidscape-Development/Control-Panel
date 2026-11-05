@@ -560,7 +560,7 @@ void EditorDialog::addPanel()
 	p.name = PanelStore::uniqueName(T("Editor.NewPanel"), m_working);
 	m_working.append(p);
 	refreshPanelList();
-	selectPanel(m_working.size() - 1);
+	selectPanel(int(m_working.size()) - 1);
 	setDirty(true);
 	m_tabs->setCurrentIndex(1);
 	m_name->setFocus();
@@ -617,7 +617,7 @@ void EditorDialog::importPanels()
 	const QList<Panel> prepared = PanelStore::prepareImport(parsed, m_working);
 	m_working.append(prepared);
 	refreshPanelList();
-	selectPanel(m_working.size() - prepared.size());
+	selectPanel(int(m_working.size() - prepared.size()));
 	setDirty(true);
 }
 
@@ -634,7 +634,7 @@ void EditorDialog::addTemplate(const QString &resource)
 	const QList<Panel> prepared = PanelStore::prepareImport(parsed, m_working);
 	m_working.append(prepared);
 	refreshPanelList();
-	selectPanel(m_working.size() - prepared.size());
+	selectPanel(int(m_working.size() - prepared.size()));
 	setDirty(true);
 }
 

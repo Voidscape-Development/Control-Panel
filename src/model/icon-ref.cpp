@@ -41,7 +41,7 @@ IconRef IconRef::parse(const QString &ref)
 
 	if (ref.startsWith(kMaterial)) {
 		QString body = ref.mid(kMaterial.size());
-		const int q = body.indexOf(QLatin1Char('?'));
+		const qsizetype q = body.indexOf(QLatin1Char('?'));
 		if (q >= 0) {
 			const QString query = body.mid(q + 1);
 			body = body.left(q);
@@ -50,7 +50,7 @@ IconRef IconRef::parse(const QString &ref)
 			else if (query == QLatin1String("fill=active"))
 				r.fill = Fill::Active;
 		}
-		const int slash = body.indexOf(QLatin1Char('/'));
+		const qsizetype slash = body.indexOf(QLatin1Char('/'));
 		if (slash <= 0 || slash == body.size() - 1)
 			return IconRef(); /* malformed: treat as no icon */
 		r.kind = Kind::Material;

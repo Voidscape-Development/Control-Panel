@@ -415,7 +415,7 @@ void CellInspector::refreshActionList()
 	for (int i = 0; i < m_cell.actions.size(); ++i)
 		m_actions->addItem(actionText(i));
 	if (m_currentAction >= m_cell.actions.size())
-		m_currentAction = m_cell.actions.size() - 1;
+		m_currentAction = int(m_cell.actions.size()) - 1;
 	m_actions->setCurrentRow(m_currentAction);
 	m_loading = false;
 
@@ -456,7 +456,7 @@ void CellInspector::addAction(const QString &typeId)
 	Action a;
 	a.type = typeId;
 	m_cell.actions.append(a);
-	m_currentAction = m_cell.actions.size() - 1;
+	m_currentAction = int(m_cell.actions.size()) - 1;
 	refreshActionList();
 	selectAction(m_currentAction);
 	refreshIndicatorCombo();

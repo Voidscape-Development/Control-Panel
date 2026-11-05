@@ -63,7 +63,7 @@ bool MaterialLibrary::open(const QString &dir, QString *error)
 	const QJsonObject root = QJsonDocument::fromJson(raw).object();
 	m_version = root.value(QStringLiteral("version")).toString();
 
-	for (const QJsonValue &v : root.value(QStringLiteral("icons")).toArray()) {
+	for (const QJsonValue v : root.value(QStringLiteral("icons")).toArray()) {
 		const QJsonObject o = v.toObject();
 		MaterialIcon icon;
 		icon.name = o.value(QStringLiteral("n")).toString();
@@ -73,9 +73,9 @@ bool MaterialLibrary::open(const QString &dir, QString *error)
 		label.replace(QLatin1Char('_'), QLatin1Char(' '));
 		label[0] = label[0].toUpper();
 		icon.label = label;
-		for (const QJsonValue &c : o.value(QStringLiteral("c")).toArray())
+		for (const QJsonValue c : o.value(QStringLiteral("c")).toArray())
 			icon.categories.append(c.toString());
-		for (const QJsonValue &t : o.value(QStringLiteral("t")).toArray())
+		for (const QJsonValue t : o.value(QStringLiteral("t")).toArray())
 			icon.tags.append(t.toString());
 		icon.popularity = o.value(QStringLiteral("p")).toInt();
 		icon.haystack = (label + QLatin1Char(' ') + icon.tags.join(QLatin1Char(' '))).toLower();

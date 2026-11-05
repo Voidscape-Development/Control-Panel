@@ -74,7 +74,7 @@ QStringList resize(Panel &panel, int rows, int cols)
 	const QRect bounds(0, 0, panel.cols, panel.rows);
 
 	QStringList removed;
-	for (int i = panel.cells.size() - 1; i >= 0; --i) {
+	for (int i = int(panel.cells.size()) - 1; i >= 0; --i) {
 		Cell &c = panel.cells[i];
 		if (!bounds.contains(c.area().topLeft())) {
 			removed.prepend(c.id);

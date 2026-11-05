@@ -72,7 +72,7 @@ bool PanelStore::load(const QString &path, QString *error)
 	}
 
 	const QJsonObject root = doc.object();
-	for (const QJsonValue &v : root.value(QStringLiteral("panels")).toArray()) {
+	for (const QJsonValue v : root.value(QStringLiteral("panels")).toArray()) {
 		Panel p = Panel::fromJson(v.toObject());
 		sanitize(p);
 		if (panel(p.id))
@@ -81,7 +81,7 @@ bool PanelStore::load(const QString &path, QString *error)
 	}
 	m_switcherPanel = root.value(QStringLiteral("switcherPanel")).toString();
 	m_globalHotkeys = root.value(QStringLiteral("hotkeys")).toObject();
-	for (const QJsonValue &v : root.value(QStringLiteral("bindingHiddenDocks")).toArray())
+	for (const QJsonValue v : root.value(QStringLiteral("bindingHiddenDocks")).toArray())
 		if (panel(v.toString()))
 			m_bindingHidden.append(v.toString());
 	emit panelsReset();
@@ -294,7 +294,7 @@ QList<Panel> PanelStore::parsePanels(const QByteArray &json, QString *error)
 		return result;
 	}
 
-	for (const QJsonValue &v : arr) {
+	for (const QJsonValue v : arr) {
 		if (!v.isObject())
 			continue;
 		Panel p = Panel::fromJson(v.toObject());
