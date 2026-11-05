@@ -2,9 +2,9 @@
 Control Panel for OBS Studio
 Copyright (C) 2026 Voidscape Development
 
-This program is free software; you can redistribute it and/or modify
+This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2 of the License, or
+the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
@@ -18,6 +18,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "icons.hpp"
 #include "../core/obs-util.hpp"
+#include "../model/material-symbols.hpp"
+
+#include <obs-module.h>
+#include <plugin-support.h>
 
 #include <QFileInfo>
 #include <QImage>
@@ -28,30 +32,41 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 namespace cp::icons {
 
 namespace {
-const QString kPrefix = QStringLiteral("builtin:");
-
-QString resourcePath(const QString &id)
-{
-	return QStringLiteral(":/control-panel/icons/%1.svg").arg(id);
-}
 
 /* Render an SVG into a transparent image fitted (aspect-preserving) and
  * centered in `px` device pixels. */
-QImage renderSvg(const QString &path, const QSize &px)
+QImage renderSvg(QSvgRenderer &svg, const QSize &px)
 {
-	QSvgRenderer svg(path);
 	if (!svg.isValid())
 		return QImage();
 	QImage img(px, QImage::Format_ARGB32_Premultiplied);
 	img.fill(Qt::transparent);
-	QSize fitted = svg.defaultSize().isEmpty() ? px : svg.defaultSize().scaled(px, Qt::KeepAspectRatio);
-	QRect target(QPoint(), fitted);
+	const QSize natural = svg.defaultSize().isEmpty() ? px : svg.defaultSize();
+	QRect target(QPoint(), natural.scaled(px, Qt::KeepAspectRatio));
 	target.moveCenter(QRect(QPoint(), px).center());
 	QPainter p(&img);
 	p.setRenderHint(QPainter::Antialiasing);
 	svg.render(&p, target);
 	return img;
 }
+
+void tint(QImage &img, const QColor &color)
+{
+	/* Keep the shape (alpha), replace the color. */
+	QPainter p(&img);
+	p.setCompositionMode(QPainter::CompositionMode_SourceIn);
+	p.fillRect(img.rect(), color);
+}
+
+QString styleLabel(const QString &style)
+{
+	if (style == QLatin1String("rounded"))
+		return T("Icons.Style.Rounded");
+	if (style == QLatin1String("sharp"))
+		return T("Icons.Style.Sharp");
+	return T("Icons.Style.Outlined");
+}
+
 } // namespace
 
 const QList<BuiltinIcon> &builtins()
@@ -89,61 +104,99 @@ const QList<BuiltinIcon> &builtins()
 	return list;
 }
 
-QString builtinRef(const QString &id)
+MaterialLibrary &material()
 {
-	return kPrefix + id;
-}
-
-bool isBuiltin(const QString &ref)
-{
-	return ref.startsWith(kPrefix);
-}
-
-QString displayName(const QString &ref)
-{
-	if (isBuiltin(ref)) {
-		const QString id = ref.mid(kPrefix.size());
-		for (const BuiltinIcon &b : builtins())
-			if (id == QLatin1String(b.id))
-				return T(b.nameKey);
-		return T("Missing").arg(id);
+	static MaterialLibrary lib;
+	static bool opened = false;
+	if (!opened) {
+		opened = true;
+		/* Installed next to the plugin as data files, not compiled in. */
+		char *dir = obs_module_file("material-symbols");
+		QString error;
+		if (!dir || !lib.open(QString::fromUtf8(dir), &error))
+			obs_log(LOG_WARNING, "Material Symbols unavailable (%s)",
+				dir ? qUtf8Printable(error) : "data directory not found");
+		else
+			obs_log(LOG_INFO, "Loaded %d Material Symbols (release %s)", int(lib.icons().size()),
+				qUtf8Printable(lib.version()));
+		bfree(dir);
 	}
-	return QFileInfo(ref).fileName();
+	return lib;
 }
 
-QPixmap render(const QString &ref, const QSize &size, qreal dpr, const QColor &tint)
+QString displayName(const QString &refString)
 {
-	if (ref.isEmpty() || size.isEmpty())
+	const IconRef ref = IconRef::parse(refString);
+	switch (ref.kind) {
+	case IconRef::Kind::Builtin:
+		for (const BuiltinIcon &b : builtins())
+			if (ref.name == QLatin1String(b.id))
+				return T(b.nameKey);
+		return T("Missing").arg(ref.name);
+	case IconRef::Kind::Material: {
+		const MaterialIcon *icon = material().icon(ref.name);
+		QString text = icon ? icon->label : T("Missing").arg(ref.name);
+		QString detail = styleLabel(ref.style);
+		if (ref.fill == IconRef::Fill::Always)
+			detail += QStringLiteral(", ") + T("Icons.Fill.Always").toLower();
+		else if (ref.fill == IconRef::Fill::Active)
+			detail += QStringLiteral(", ") + T("Icons.Fill.Active").toLower();
+		return QStringLiteral("%1 (%2)").arg(text, detail);
+	}
+	case IconRef::Kind::File:
+		return QFileInfo(ref.path).fileName();
+	case IconRef::Kind::None:
+		break;
+	}
+	return QString();
+}
+
+QPixmap render(const QString &refString, const QSize &size, qreal dpr, const QColor &color, bool active)
+{
+	const IconRef ref = IconRef::parse(refString);
+	if (ref.kind == IconRef::Kind::None || size.isEmpty())
 		return QPixmap();
 	const QSize px = size * dpr;
-	const bool builtin = isBuiltin(ref);
-	const QString key = QStringLiteral("cp-icon|%1|%2x%3|%4")
-				    .arg(ref)
+	const bool filled = ref.kind == IconRef::Kind::Material && ref.filledWhen(active);
+	const QString key = QStringLiteral("cp-icon|%1|%2|%3x%4|%5")
+				    .arg(refString)
+				    .arg(filled)
 				    .arg(px.width())
 				    .arg(px.height())
-				    .arg(builtin ? tint.name(QColor::HexArgb) : QString());
+				    .arg(ref.isTinted() ? color.name(QColor::HexArgb) : QString());
 	QPixmap cached;
 	if (QPixmapCache::find(key, &cached))
 		return cached;
 
 	QImage img;
-	if (builtin) {
-		img = renderSvg(resourcePath(ref.mid(kPrefix.size())), px);
-		if (!img.isNull()) {
-			/* Keep the shape (alpha), replace the color. */
-			QPainter p(&img);
-			p.setCompositionMode(QPainter::CompositionMode_SourceIn);
-			p.fillRect(img.rect(), tint);
+	switch (ref.kind) {
+	case IconRef::Kind::Builtin: {
+		QSvgRenderer svg(QStringLiteral(":/control-panel/icons/%1.svg").arg(ref.name));
+		img = renderSvg(svg, px);
+		break;
+	}
+	case IconRef::Kind::Material: {
+		QSvgRenderer svg(material().svg(ref.style, ref.name, filled));
+		img = renderSvg(svg, px);
+		break;
+	}
+	case IconRef::Kind::File:
+		if (ref.path.endsWith(QLatin1String(".svg"), Qt::CaseInsensitive)) {
+			QSvgRenderer svg(ref.path);
+			img = renderSvg(svg, px);
+		} else {
+			QImage src(ref.path);
+			if (!src.isNull())
+				img = src.scaled(px, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 		}
-	} else if (ref.endsWith(QLatin1String(".svg"), Qt::CaseInsensitive)) {
-		img = renderSvg(ref, px);
-	} else {
-		QImage src(ref);
-		if (!src.isNull())
-			img = src.scaled(px, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+		break;
+	case IconRef::Kind::None:
+		break;
 	}
 	if (img.isNull())
 		return QPixmap();
+	if (ref.isTinted())
+		tint(img, color);
 
 	QPixmap pm = QPixmap::fromImage(img);
 	pm.setDevicePixelRatio(dpr);
@@ -151,11 +204,11 @@ QPixmap render(const QString &ref, const QSize &size, qreal dpr, const QColor &t
 	return pm;
 }
 
-QIcon menuIcon(const QString &ref, const QColor &tint)
+QIcon menuIcon(const QString &ref, const QColor &color)
 {
 	QIcon icon;
 	for (int s : {16, 24, 32, 48})
-		icon.addPixmap(render(ref, QSize(s, s), 1.0, tint));
+		icon.addPixmap(render(ref, QSize(s, s), 1.0, color));
 	return icon;
 }
 

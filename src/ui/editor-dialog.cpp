@@ -2,9 +2,9 @@
 Control Panel for OBS Studio
 Copyright (C) 2026 Voidscape Development
 
-This program is free software; you can redistribute it and/or modify
+This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2 of the License, or
+the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
@@ -128,6 +128,9 @@ EditorDialog::EditorDialog(QWidget *parent) : QDialog(parent)
 	QMenu *templates = ioMenu->addMenu(T("Editor.Templates"));
 	templates->addAction(T("Template.StreamingEssentials"), this, [this]() {
 		addTemplate(QStringLiteral(":/control-panel/templates/streaming-essentials.json"));
+	});
+	templates->addAction(T("Template.StreamingEssentialsMaterial"), this, [this]() {
+		addTemplate(QStringLiteral(":/control-panel/templates/streaming-essentials-material.json"));
 	});
 	io->setMenu(ioMenu);
 	lbar->addWidget(add);

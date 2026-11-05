@@ -2,6 +2,7 @@
 <RCC version="1.0">
   <qresource prefix="/control-panel">
     <file alias="templates/streaming-essentials.json">../../examples/panels/streaming-essentials.json</file>
+    <file alias="templates/streaming-essentials-material.json">../../examples/panels/streaming-essentials-material.json</file>
     <file>icons/bell.svg</file>
     <file>icons/bolt.svg</file>
     <file>icons/camera.svg</file>

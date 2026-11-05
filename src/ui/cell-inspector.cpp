@@ -2,9 +2,9 @@
 Control Panel for OBS Studio
 Copyright (C) 2026 Voidscape Development
 
-This program is free software; you can redistribute it and/or modify
+This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2 of the License, or
+the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
@@ -17,6 +17,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 
 #include "cell-inspector.hpp"
+#include "icon-picker.hpp"
 #include "icons.hpp"
 #include "properties-form.hpp"
 #include "../core/type-registry.hpp"
@@ -36,7 +37,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QSpinBox>
 #include <QToolButton>
 #include <QVBoxLayout>
-#include <QWidgetAction>
 
 namespace cp {
 
@@ -88,55 +88,27 @@ CellInspector::CellInspector(QWidget *parent) : QWidget(parent)
 	m_showLabel = new QCheckBox(T("Inspector.ShowLabel"), general);
 	gform->addRow(QString(), m_showLabel);
 
-	/* Icon picker: a grid of built-in icons, or an image file. */
-	m_icon = new QToolButton(general);
+	/* Icon: opens the searchable picker (Material Symbols, built-ins, file).
+	 * The small clear button removes the icon without opening it. */
+	auto *iconRow = new QWidget(general);
+	auto *ih = new QHBoxLayout(iconRow);
+	ih->setContentsMargins(0, 0, 0, 0);
+	m_icon = new QToolButton(iconRow);
 	m_icon->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-	m_icon->setPopupMode(QToolButton::InstantPopup);
 	m_icon->setIconSize(QSize(20, 20));
 	m_icon->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 	m_icon->setAccessibleName(T("Inspector.Icon"));
-	auto *iconMenu = new QMenu(m_icon);
-	auto *grid = new QListWidget(iconMenu);
-	grid->setViewMode(QListView::IconMode);
-	grid->setIconSize(QSize(28, 28));
-	grid->setGridSize(QSize(44, 44));
-	grid->setMovement(QListView::Static);
-	grid->setResizeMode(QListView::Adjust);
-	grid->setUniformItemSizes(true);
-	/* Size to show every icon at once: no scrolling inside a popup. */
-	constexpr int kIconCols = 7;
-	const int iconRows = int(icons::builtins().size() + kIconCols - 1) / kIconCols;
-	grid->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-	grid->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-	grid->setFixedSize(44 * kIconCols + 8, 44 * iconRows + 8);
-	grid->setFrameShape(QFrame::NoFrame);
-	const QColor tint = palette().color(QPalette::ButtonText);
-	for (const icons::BuiltinIcon &b : icons::builtins()) {
-		auto *item = new QListWidgetItem(icons::menuIcon(icons::builtinRef(b.id), tint), QString(), grid);
-		item->setData(Qt::UserRole, icons::builtinRef(b.id));
-		item->setToolTip(T(b.nameKey));
-	}
-	auto *gridAction = new QWidgetAction(iconMenu);
-	gridAction->setDefaultWidget(grid);
-	iconMenu->addAction(gridAction);
-	iconMenu->addSeparator();
-	QAction *fromFile = iconMenu->addAction(T("Inspector.IconFromFile"));
-	QAction *removeIcon = iconMenu->addAction(T("Inspector.ClearIcon"));
-	m_icon->setMenu(iconMenu);
-	gform->addRow(T("Inspector.Icon"), m_icon);
+	auto *clearIcon = toolButton(QStringLiteral("✕"), T("Inspector.ClearIcon"), iconRow);
+	ih->addWidget(m_icon, 1);
+	ih->addWidget(clearIcon);
+	gform->addRow(T("Inspector.Icon"), iconRow);
 
-	connect(grid, &QListWidget::itemClicked, this, [this, iconMenu](QListWidgetItem *item) {
-		iconMenu->close();
-		setIcon(item->data(Qt::UserRole).toString());
+	connect(m_icon, &QToolButton::clicked, this, [this]() {
+		IconPickerDialog dlg(m_cell.iconPath, this);
+		if (dlg.exec() == QDialog::Accepted)
+			setIcon(dlg.selectedRef());
 	});
-	connect(fromFile, &QAction::triggered, this, [this]() {
-		const QString start = icons::isBuiltin(m_cell.iconPath) ? QString() : m_cell.iconPath;
-		const QString path =
-			QFileDialog::getOpenFileName(this, T("Inspector.Icon"), start, T("Inspector.ImageFilter"));
-		if (!path.isEmpty())
-			setIcon(path);
-	});
-	connect(removeIcon, &QAction::triggered, this, [this]() { setIcon(QString()); });
+	connect(clearIcon, &QToolButton::clicked, this, [this]() { setIcon(QString()); });
 	layout->addWidget(general);
 
 	/* ---- style ---- */
@@ -416,7 +388,7 @@ void CellInspector::refreshIconButton()
 	const QString ref = m_cell.iconPath;
 	m_icon->setText(ref.isEmpty() ? T("Inspector.NoIcon") : icons::displayName(ref));
 	m_icon->setIcon(ref.isEmpty() ? QIcon() : icons::menuIcon(ref, palette().color(QPalette::ButtonText)));
-	m_icon->setToolTip(icons::isBuiltin(ref) ? QString() : ref);
+	m_icon->setToolTip(IconRef::parse(ref).kind == IconRef::Kind::File ? ref : QString());
 }
 
 QString CellInspector::actionText(int i) const

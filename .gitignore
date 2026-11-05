@@ -11,6 +11,7 @@
 !/examples
 !/include
 !/tests
+!/tools
 !/src
 !.clang-format
 !.gersemirc

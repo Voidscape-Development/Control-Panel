@@ -2,9 +2,9 @@
 Control Panel for OBS Studio
 Copyright (C) 2026 Voidscape Development
 
-This program is free software; you can redistribute it and/or modify
+This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2 of the License, or
+the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
@@ -118,7 +118,7 @@ void paintCell(QPainter &p, const QRect &rect, const CellVisual &v, control_pane
 	QRect content = rect.adjusted(4, 3, -4, -3);
 	const QPixmap icon = icons::render(
 		v.icon, v.text.isEmpty() ? content.size() : QSize(content.width(), content.height() * 3 / 5),
-		p.device()->devicePixelRatioF(), fg);
+		p.device()->devicePixelRatioF(), fg, active);
 	if (!icon.isNull()) {
 		QRect iconArea = content;
 		if (!v.text.isEmpty())

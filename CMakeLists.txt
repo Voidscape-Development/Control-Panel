@@ -51,6 +51,10 @@ target_sources(
     src/plugin-main.cpp
     src/model/grid.cpp
     src/model/grid.hpp
+    src/model/icon-ref.cpp
+    src/model/icon-ref.hpp
+    src/model/material-symbols.cpp
+    src/model/material-symbols.hpp
     src/model/panel-model.cpp
     src/model/panel-model.hpp
     src/model/panel-store.cpp
@@ -79,6 +83,8 @@ target_sources(
     src/ui/editor-dialog.hpp
     src/ui/grid-canvas.cpp
     src/ui/grid-canvas.hpp
+    src/ui/icon-picker.cpp
+    src/ui/icon-picker.hpp
     src/ui/icons.cpp
     src/ui/icons.hpp
     src/ui/panel-view.cpp

@@ -20,8 +20,9 @@ now.
   when their target is missing.
 - **Styling.** Panel-wide defaults and per-cell overrides for background,
   text, active colors and font size. Unstyled cells follow the OBS theme.
-- **Icons.** A built-in icon set that follows the cell's colors, or your own
-  images.
+- **Icons.** Search Google's Material Symbols library (3,940 icons, three
+  styles, outline or filled), use the built-in set, or your own images.
+  Icons follow the cell's colors and can fill in when a button lights up.
 - **Per-collection panels.** Bind a panel to a scene collection and it only
   appears while that collection is loaded.
 - **Hotkeys.** Every panel gets "Show" and "Show in switcher" hotkeys, plus
@@ -72,26 +73,35 @@ record, replay buffer...) and status displays work everywhere.
 ## Icons
 
 Buttons can show an icon above their label, or on its own with **Show label**
-turned off. Pick one in the cell inspector:
+turned off. Click **Icon** in the cell inspector to open the picker:
 
-- **Built-in icons**: 28 single-color icons that ship with the plugin
-  (record, stream, pause, replay, save, camera, mic, eye, filter, scene,
-  transition and more). They take on the cell's text color and switch to the
-  active text color when the button lights up. They are stored as
-  `builtin:<name>`, so panels using them can be exported and shared.
-- **Your own image**: PNG, JPG, SVG and others, drawn as-is. SVGs stay sharp
-  at any size. These are stored as file paths, so shared panels need the file
-  too.
+- **Material Symbols**: Google's library of 3,940 icons in Outlined, Rounded
+  and Sharp styles. Search by name or tag ("dictation" finds the microphone)
+  and filter by category. Each icon can be shown as an outline, filled, or
+  **filled when lit** (outline normally, filled while the button is active).
+- **Built-in**: 28 original icons made for this plugin.
+- **From file**: your own PNG, JPG, SVG and others, drawn as-is.
+
+Material Symbols and built-in icons take on the cell's text color and switch
+to the active text color when the button lights up. They're stored by name
+(e.g. `material:rounded/mic?fill=active`), so panels that use them can be
+exported and shared. Everything works offline: the Material Symbols ship as
+data files with the plugin. See [docs/ICONS.md](docs/ICONS.md) for the format,
+how to update to a newer release, and notes on a possible optional download.
 
 ## Templates
 
-**Import / Export → Add from Template** in the editor adds a ready-made panel.
-**Streaming Essentials** has stream, record, pause, virtual camera, replay
-buffer, save replay, Studio Mode, transition and screenshot buttons with
-built-in icons, plus stream/record timers, a clock, CPU and FPS. It uses no
-scene or source references, so it works with any setup. The same panel is
-available as an importable file at
-[`examples/panels/streaming-essentials.json`](examples/panels/streaming-essentials.json).
+**Import / Export → Add from Template** in the editor adds a ready-made panel:
+
+- **Streaming Essentials (built-in icons)**
+- **Streaming Essentials (Material Symbols)**: the same panel with rounded
+  Material icons that fill in when lit.
+
+Both have stream, record, pause, virtual camera, replay buffer, save replay,
+Studio Mode, transition and screenshot buttons, plus stream/record timers, a
+clock, CPU and FPS. They use no scene or source references, so they work with
+any setup. Both are also available as importable files in
+[`examples/panels/`](examples/panels/).
 
 ## Where things are stored
 
@@ -163,12 +173,22 @@ src/core/                     OBS integration: type registry, built-in actions
                               and widgets, runtime, hotkeys, obs-websocket
 src/ui/                       docks, panel view, layout canvas, editor, inspector
 src/ui/icons/                 built-in icon set (SVG, compiled into the plugin)
+data/material-symbols/        Material Symbols packs (Apache-2.0 data files)
+tools/                        asset scripts (update-material-symbols.py)
 tests/                        unit tests for src/model
 examples/example-extension/   sample plugin adding an action and a widget type
 examples/panels/              importable example panels
 docs/API.md                   extension API guide
+docs/ICONS.md                 icon references, packs, updating, licensing
 ```
 
 ## License
 
-GPL-2.0-or-later. See [LICENSE](LICENSE).
+Control Panel is licensed under the **GNU General Public License v3.0 or
+later**. See [LICENSE](LICENSE).
+
+It includes [Material Symbols](https://fonts.google.com/icons) by Google,
+licensed under the Apache License 2.0, shipped unmodified as separate data
+files in `data/material-symbols/` together with that license. The vendored
+`deps/obs-websocket-api/obs-websocket-api.h` is from obs-websocket
+(GPL-2.0-or-later).
