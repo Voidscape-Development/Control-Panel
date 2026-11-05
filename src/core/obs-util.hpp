@@ -44,11 +44,17 @@ struct SourceDeleter {
 	void operator()(obs_source_t *s) const { obs_source_release(s); }
 };
 using SourcePtr = std::unique_ptr<obs_source_t, SourceDeleter>;
-SourcePtr sourceByName(const char *name);
-inline SourcePtr sourceByName(const QString &name)
+
+/* Sources (scenes, inputs and filters) are referenced by UUID only, never by
+ * name: UUIDs survive renames. They are unique per scene collection. */
+SourcePtr sourceByUuid(const char *uuid);
+inline SourcePtr sourceByUuid(const QString &uuid)
 {
-	return sourceByName(name.toUtf8().constData());
+	return sourceByUuid(uuid.toUtf8().constData());
 }
+QString sourceUuid(const obs_source_t *source);
+/* Display name for a UUID, or an empty string if it doesn't resolve. */
+QString sourceNameByUuid(const char *uuid);
 
 QString currentSceneCollection();
 QStringList sceneCollections();
@@ -65,12 +71,16 @@ enum class SourceFilter {
 	Media,  /* inputs with controllable media */
 };
 
-/* Fills a string list property with source names (sorted). If the current
- * value isn't present (e.g. a source of another collection), it is kept as a
- * "missing" entry so the setting isn't silently lost. */
-void fillSourceList(obs_property_t *list, SourceFilter filter, const char *current);
+/* Fills a string list property: items show source names, values are UUIDs.
+ * A current UUID that doesn't resolve (deleted source, or a source from
+ * another scene collection) is kept as a disabled "missing" entry so the
+ * setting isn't silently lost. */
+void fillSourceList(obs_property_t *list, SourceFilter filter, const char *currentUuid);
 obs_property_t *addSourceList(obs_properties_t *props, const char *key, const char *desc, SourceFilter filter,
 			      obs_data_t *settings);
+
+/* Adds the "missing" placeholder for an unresolved UUID to a list. */
+void addMissingItem(obs_property_t *list, const char *uuid);
 
 /* Adds a "mode" list: toggle / on / off with custom labels. */
 obs_property_t *addModeList(obs_properties_t *props, const char *onLabel, const char *offLabel);

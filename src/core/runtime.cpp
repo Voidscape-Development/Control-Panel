@@ -20,7 +20,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <plugin-support.h>
 
-#include <QPointer>
 #include <QTimer>
 
 #include <vector>
@@ -133,14 +132,10 @@ void Runtime::destroy()
 	g_runtime = nullptr;
 }
 
-Runtime::Runtime()
-{
-	signal_handler_connect(obs_get_signal_handler(), "source_rename", &Runtime::onSourceRename, this);
-}
+Runtime::Runtime() = default;
 
 Runtime::~Runtime()
 {
-	signal_handler_disconnect(obs_get_signal_handler(), "source_rename", &Runtime::onSourceRename, this);
 	m_store.saveNow();
 }
 
@@ -187,70 +182,6 @@ bool Runtime::triggerCell(const QString &panelId, const QString &cellId)
 	/* Most actions change state; reflect it without waiting for the poll. */
 	QTimer::singleShot(50, this, &Runtime::requestRefresh);
 	return true;
-}
-
-void Runtime::onSourceRename(void *data, calldata_t *cd)
-{
-	auto *self = static_cast<Runtime *>(data);
-	obs_source_t *source = static_cast<obs_source_t *>(calldata_ptr(cd, "source"));
-	SourceRename rename;
-	rename.oldName = utf8(calldata_string(cd, "prev_name"));
-	rename.newName = utf8(calldata_string(cd, "new_name"));
-	if (source && obs_source_get_type(source) == OBS_SOURCE_TYPE_FILTER) {
-		rename.isFilter = true;
-		if (obs_source_t *parent = obs_filter_get_parent(source))
-			rename.filterParent = utf8(obs_source_get_name(parent));
-	}
-	if (rename.oldName.isEmpty() || rename.oldName == rename.newName)
-		return;
-
-	/* May fire on any thread. */
-	QPointer<Runtime> guard(self);
-	QMetaObject::invokeMethod(
-		self,
-		[guard, rename]() {
-			if (guard)
-				guard->handleRename(rename);
-		},
-		Qt::QueuedConnection);
-}
-
-void Runtime::handleRename(const SourceRename &rename)
-{
-	TypeRegistry *reg = TypeRegistry::instance();
-	if (!reg)
-		return;
-
-	/* Only panels in use by the current collection: a panel bound to another
-	 * collection may legitimately refer to a different source of that name. */
-	const QList<Panel> panels = m_store.panels();
-	for (Panel panel : panels) {
-		if (!isPanelActive(panel))
-			continue;
-		bool changed = false;
-		for (Cell &cell : panel.cells) {
-			for (Action &action : cell.actions) {
-				ActionTypePtr type = reg->action(action.type);
-				if (!type)
-					continue;
-				DataPtr settings = dataFromJson(action.settings);
-				if (type->sourceRenamed(settings.get(), rename)) {
-					action.settings = dataToJson(settings.get());
-					changed = true;
-				}
-			}
-			if (cell.kind == CellKind::Widget) {
-				WidgetTypePtr type = reg->widget(cell.widgetType);
-				DataPtr settings = dataFromJson(cell.widgetSettings);
-				if (type && type->sourceRenamed(settings.get(), rename)) {
-					cell.widgetSettings = dataToJson(settings.get());
-					changed = true;
-				}
-			}
-		}
-		if (changed)
-			m_store.updatePanel(panel);
-	}
 }
 
 } // namespace cp

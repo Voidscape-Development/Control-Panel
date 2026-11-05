@@ -69,6 +69,7 @@ private:
 	void duplicatePanel();
 	void removePanel();
 	void importPanels();
+	void addTemplate(const QString &resource);
 	void exportPanels(bool all);
 
 	void createCell(const QRect &area, CellKind kind);

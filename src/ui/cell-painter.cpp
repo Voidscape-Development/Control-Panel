@@ -17,12 +17,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 
 #include "cell-painter.hpp"
+#include "icons.hpp"
 #include "../core/runtime.hpp"
 
 #include <QFontMetrics>
 #include <QPainter>
 #include <QPainterPath>
-#include <QPixmapCache>
 
 #include <algorithm>
 
@@ -47,26 +47,12 @@ ResolvedStyle resolveStyle(const Cell &cell, const Theme &theme, const QPalette 
 	return r;
 }
 
-QPixmap loadIcon(const QString &path)
-{
-	if (path.isEmpty())
-		return QPixmap();
-	QPixmap pm;
-	const QString key = QStringLiteral("cp-icon:") + path;
-	if (!QPixmapCache::find(key, &pm)) {
-		pm.load(path);
-		if (!pm.isNull())
-			QPixmapCache::insert(key, pm);
-	}
-	return pm;
-}
-
 CellVisual visualFor(const Cell &cell, const Theme &theme, const QPalette &palette)
 {
 	CellVisual v;
 	v.kind = cell.kind;
 	v.text = cell.showLabel || cell.kind == CellKind::Label ? effectiveLabel(cell) : QString();
-	v.icon = cell.kind == CellKind::Button ? loadIcon(cell.iconPath) : QPixmap();
+	v.icon = cell.kind == CellKind::Button ? cell.iconPath : QString();
 	v.style = resolveStyle(cell, theme, palette);
 	return v;
 }
@@ -130,16 +116,16 @@ void paintCell(QPainter &p, const QRect &rect, const CellVisual &v, control_pane
 	}
 
 	QRect content = rect.adjusted(4, 3, -4, -3);
-	if (!v.icon.isNull()) {
+	const QPixmap icon = icons::render(
+		v.icon, v.text.isEmpty() ? content.size() : QSize(content.width(), content.height() * 3 / 5),
+		p.device()->devicePixelRatioF(), fg);
+	if (!icon.isNull()) {
 		QRect iconArea = content;
 		if (!v.text.isEmpty())
 			iconArea.setHeight(content.height() * 3 / 5);
-		const qreal dpr = p.device()->devicePixelRatioF();
-		QPixmap pm = v.icon.scaled(iconArea.size() * dpr, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-		pm.setDevicePixelRatio(dpr);
-		QRect target(QPoint(), pm.deviceIndependentSize().toSize());
+		QRect target(QPoint(), icon.deviceIndependentSize().toSize());
 		target.moveCenter(iconArea.center());
-		p.drawPixmap(target.topLeft(), pm);
+		p.drawPixmap(target.topLeft(), icon);
 		if (!v.text.isEmpty())
 			content.setTop(iconArea.bottom() + 1);
 	}

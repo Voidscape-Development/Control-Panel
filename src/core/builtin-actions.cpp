@@ -17,9 +17,12 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 
 /*
- * Built-in action types. Sources are referenced by name rather than UUID:
- * panels are global and may be used with several scene collections, and
- * names are what users recognize. Renames are tracked by Runtime.
+ * Built-in action types.
+ *
+ * Every scene, source, filter and source-owned hotkey is referenced by UUID
+ * (settings keys end in "_uuid"), never by name, so renames can't break a
+ * panel. UUIDs belong to a scene collection: a panel meant for one
+ * collection should be bound to it.
  */
 
 #include "runtime.hpp"
@@ -35,22 +38,19 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 namespace cp {
 namespace {
 
-bool renameKey(obs_data_t *settings, const char *key, const SourceRename &r)
-{
-	if (r.isFilter)
-		return false;
-	if (QString::fromUtf8(obs_data_get_string(settings, key)) != r.oldName)
-		return false;
-	obs_data_set_string(settings, key, r.newName.toUtf8().constData());
-	return true;
-}
+const char *kScene = "scene_uuid";
+const char *kSource = "source_uuid";
+const char *kFilter = "filter_uuid";
 
 /* ===================================================================== */
 /* Hotkey                                                                */
 /* ===================================================================== */
 
-/* Hotkey ids change every session, so they are persisted by registerer
- * type + owner name + hotkey name. */
+/* Hotkey ids change every session, so a hotkey is persisted as
+ * registerer type + owner + hotkey name. The owner of a source hotkey is the
+ * source UUID. Outputs, encoders and services have no UUID in libobs; their
+ * internal (non user-facing, stable) object name is used instead. Frontend
+ * hotkeys have no owner. */
 struct HotkeyRef {
 	int type = OBS_HOTKEY_REGISTERER_FRONTEND;
 	QString owner;
@@ -71,42 +71,48 @@ struct HotkeyRef {
 	}
 };
 
-QString hotkeyOwnerName(obs_hotkey_t *key)
+struct HotkeyOwner {
+	QString key;     /* persisted: UUID for sources, internal name otherwise */
+	QString display; /* shown in the editor */
+};
+
+HotkeyOwner hotkeyOwner(obs_hotkey_t *key)
 {
 	void *reg = obs_hotkey_get_registerer(key);
 	switch (obs_hotkey_get_registerer_type(key)) {
 	case OBS_HOTKEY_REGISTERER_SOURCE: {
 		obs_source_t *s = obs_weak_source_get_source(static_cast<obs_weak_source_t *>(reg));
-		QString n = s ? utf8(obs_source_get_name(s)) : QString();
+		HotkeyOwner o{sourceUuid(s), s ? utf8(obs_source_get_name(s)) : QString()};
 		obs_source_release(s);
-		return n;
+		return o;
 	}
 	case OBS_HOTKEY_REGISTERER_OUTPUT: {
-		obs_output_t *o = obs_weak_output_get_output(static_cast<obs_weak_output_t *>(reg));
-		QString n = o ? utf8(obs_output_get_name(o)) : QString();
-		obs_output_release(o);
-		return n;
+		obs_output_t *out = obs_weak_output_get_output(static_cast<obs_weak_output_t *>(reg));
+		const QString n = out ? utf8(obs_output_get_name(out)) : QString();
+		obs_output_release(out);
+		return {n, n};
 	}
 	case OBS_HOTKEY_REGISTERER_ENCODER: {
 		obs_encoder_t *e = obs_weak_encoder_get_encoder(static_cast<obs_weak_encoder_t *>(reg));
-		QString n = e ? utf8(obs_encoder_get_name(e)) : QString();
+		const QString n = e ? utf8(obs_encoder_get_name(e)) : QString();
 		obs_encoder_release(e);
-		return n;
+		return {n, n};
 	}
 	case OBS_HOTKEY_REGISTERER_SERVICE: {
-		obs_service_t *s = obs_weak_service_get_service(static_cast<obs_weak_service_t *>(reg));
-		QString n = s ? utf8(obs_service_get_name(s)) : QString();
-		obs_service_release(s);
-		return n;
+		obs_service_t *sv = obs_weak_service_get_service(static_cast<obs_weak_service_t *>(reg));
+		const QString n = sv ? utf8(obs_service_get_name(sv)) : QString();
+		obs_service_release(sv);
+		return {n, n};
 	}
 	default:
-		return QString();
+		return {};
 	}
 }
 
 struct HotkeyEntry {
 	obs_hotkey_id id;
 	HotkeyRef ref;
+	QString ownerName;
 	QString description;
 };
 
@@ -116,11 +122,13 @@ std::vector<HotkeyEntry> enumHotkeys()
 	obs_enum_hotkeys(
 		[](void *data, obs_hotkey_id id, obs_hotkey_t *key) {
 			auto *out = static_cast<std::vector<HotkeyEntry> *>(data);
+			const HotkeyOwner owner = hotkeyOwner(key);
 			HotkeyEntry e;
 			e.id = id;
 			e.ref.type = obs_hotkey_get_registerer_type(key);
-			e.ref.owner = hotkeyOwnerName(key);
+			e.ref.owner = owner.key;
 			e.ref.name = utf8(obs_hotkey_get_name(key));
+			e.ownerName = owner.display;
 			e.description = utf8(obs_hotkey_get_description(key));
 			out->push_back(e);
 			return true;
@@ -142,9 +150,9 @@ bool findHotkey(const HotkeyRef &ref, HotkeyEntry *out)
 
 QString hotkeyDisplay(const HotkeyEntry &e)
 {
-	if (e.ref.owner.isEmpty())
+	if (e.ownerName.isEmpty())
 		return e.description;
-	return QStringLiteral("%1: %2").arg(e.ref.owner, e.description);
+	return QStringLiteral("%1: %2").arg(e.ownerName, e.description);
 }
 
 class HotkeyAction : public ActionType {
@@ -162,8 +170,8 @@ public:
 		std::vector<HotkeyEntry> entries = enumHotkeys();
 		/* Frontend hotkeys first, then per owner, alphabetically. */
 		std::sort(entries.begin(), entries.end(), [](const HotkeyEntry &a, const HotkeyEntry &b) {
-			if (a.ref.owner.isEmpty() != b.ref.owner.isEmpty())
-				return a.ref.owner.isEmpty();
+			if (a.ownerName.isEmpty() != b.ownerName.isEmpty())
+				return a.ownerName.isEmpty();
 			return QString::localeAwareCompare(hotkeyDisplay(a), hotkeyDisplay(b)) < 0;
 		});
 
@@ -179,9 +187,7 @@ public:
 			found = found || key == current;
 		}
 		if (!found) {
-			const HotkeyRef ref = HotkeyRef::decode(current);
-			const QString missing =
-				T("Missing").arg(ref.owner.isEmpty() ? ref.name : ref.owner + ": " + ref.name);
+			const QString missing = T("Missing").arg(HotkeyRef::decode(current).name);
 			const size_t idx = obs_property_list_add_string(list, missing.toUtf8().constData(),
 									current.toUtf8().constData());
 			obs_property_list_item_disable(list, idx, true);
@@ -207,18 +213,6 @@ public:
 			return e.description;
 		return {};
 	}
-
-	bool sourceRenamed(obs_data_t *settings, const SourceRename &r) const override
-	{
-		if (r.isFilter)
-			return false;
-		HotkeyRef ref = HotkeyRef::decode(utf8(obs_data_get_string(settings, "hotkey")));
-		if (ref.type != OBS_HOTKEY_REGISTERER_SOURCE || ref.owner != r.oldName)
-			return false;
-		ref.owner = r.newName;
-		obs_data_set_string(settings, "hotkey", ref.encode().toUtf8().constData());
-		return true;
-	}
 };
 
 /* ===================================================================== */
@@ -234,7 +228,7 @@ public:
 	obs_properties_t *properties(obs_data_t *settings) const override
 	{
 		obs_properties_t *props = obs_properties_create();
-		addSourceList(props, "scene", Tc("Scene"), SourceFilter::Scenes, settings);
+		addSourceList(props, kScene, Tc("Scene"), SourceFilter::Scenes, settings);
 		obs_property_t *t = obs_properties_add_list(props, "target", Tc("Target"), OBS_COMBO_TYPE_LIST,
 							    OBS_COMBO_FORMAT_STRING);
 		obs_property_list_add_string(t, Tc("Target.Program"), "program");
@@ -256,7 +250,7 @@ public:
 
 	void execute(obs_data_t *settings) const override
 	{
-		SourcePtr scene = sourceByName(obs_data_get_string(settings, "scene"));
+		SourcePtr scene = sourceByUuid(obs_data_get_string(settings, kScene));
 		if (!scene || !obs_source_is_scene(scene.get()))
 			return;
 		if (toPreview(settings))
@@ -268,8 +262,7 @@ public:
 	bool hasState() const override { return true; }
 	control_panel_state state(obs_data_t *settings) const override
 	{
-		const char *want = obs_data_get_string(settings, "scene");
-		SourcePtr scene = sourceByName(want);
+		SourcePtr scene = sourceByUuid(obs_data_get_string(settings, kScene));
 		if (!scene)
 			return CONTROL_PANEL_STATE_UNAVAILABLE;
 		SourcePtr current(toPreview(settings) ? obs_frontend_get_current_preview_scene()
@@ -279,11 +272,7 @@ public:
 
 	QString defaultLabel(obs_data_t *settings) const override
 	{
-		return utf8(obs_data_get_string(settings, "scene"));
-	}
-	bool sourceRenamed(obs_data_t *settings, const SourceRename &r) const override
-	{
-		return renameKey(settings, "scene", r);
+		return sourceNameByUuid(obs_data_get_string(settings, kScene));
 	}
 };
 
@@ -303,62 +292,87 @@ public:
 		return obs_frontend_preview_program_mode_active() ? CONTROL_PANEL_STATE_NONE
 								  : CONTROL_PANEL_STATE_UNAVAILABLE;
 	}
+	QString defaultLabel(obs_data_t *) const override { return name(); }
 };
 
 /* ===================================================================== */
 /* Sources                                                               */
 /* ===================================================================== */
 
-obs_sceneitem_t *findItem(obs_data_t *settings)
+/* Calls fn for every item of a scene, descending into groups. */
+void forEachItem(obs_scene_t *scene, const std::function<bool(obs_sceneitem_t *)> &fn)
 {
-	SourcePtr sceneSource = sourceByName(obs_data_get_string(settings, "scene"));
-	obs_scene_t *scene = sceneSource ? obs_scene_from_source(sceneSource.get()) : nullptr;
-	if (!scene)
-		return nullptr;
-	/* The scene item isn't ref'd; it stays valid while the scene lives and
-	 * we only use it synchronously on the UI thread. */
-	return obs_scene_find_source_recursive(scene, obs_data_get_string(settings, "source"));
+	struct Ctx {
+		const std::function<bool(obs_sceneitem_t *)> *fn;
+		bool stop = false;
+	} ctx{&fn};
+	auto cb = [](obs_scene_t *, obs_sceneitem_t *item, void *param) {
+		auto *c = static_cast<Ctx *>(param);
+		if (!(*c->fn)(item)) {
+			c->stop = true;
+			return false;
+		}
+		if (obs_sceneitem_is_group(item))
+			obs_sceneitem_group_enum_items(
+				item,
+				[](obs_scene_t *, obs_sceneitem_t *child, void *p) {
+					auto *cc = static_cast<Ctx *>(p);
+					if (!(*cc->fn)(child))
+						cc->stop = true;
+					return !cc->stop;
+				},
+				param);
+		return !c->stop;
+	};
+	obs_scene_enum_items(scene, cb, &ctx);
 }
 
-void fillSceneItems(obs_property_t *list, const char *sceneName, const char *current)
+/* The scene item showing source_uuid inside scene_uuid. Not ref'd: valid
+ * while the scene lives, used synchronously on the UI thread only. */
+obs_sceneitem_t *findItem(obs_data_t *settings)
+{
+	SourcePtr sceneSource = sourceByUuid(obs_data_get_string(settings, kScene));
+	obs_scene_t *scene = sceneSource ? obs_scene_from_source(sceneSource.get()) : nullptr;
+	const char *want = obs_data_get_string(settings, kSource);
+	if (!scene || !*want)
+		return nullptr;
+	obs_sceneitem_t *found = nullptr;
+	forEachItem(scene, [&](obs_sceneitem_t *item) {
+		if (strcmp(obs_source_get_uuid(obs_sceneitem_get_source(item)), want) == 0) {
+			found = item;
+			return false;
+		}
+		return true;
+	});
+	return found;
+}
+
+void fillSceneItems(obs_property_t *list, const char *sceneUuid, const char *currentUuid)
 {
 	obs_property_list_clear(list);
 	obs_property_list_add_string(list, "", "");
 
-	std::vector<std::string> names;
-	SourcePtr sceneSource = sourceByName(sceneName);
-	obs_scene_t *scene = sceneSource ? obs_scene_from_source(sceneSource.get()) : nullptr;
-	if (scene) {
-		struct Ctx {
-			std::vector<std::string> *names;
-		} ctx{&names};
-		auto cb = [](obs_scene_t *, obs_sceneitem_t *item, void *param) {
-			auto *c = static_cast<Ctx *>(param);
-			c->names->emplace_back(obs_source_get_name(obs_sceneitem_get_source(item)));
-			if (obs_sceneitem_is_group(item))
-				obs_sceneitem_group_enum_items(
-					item,
-					[](obs_scene_t *, obs_sceneitem_t *child, void *p) {
-						static_cast<Ctx *>(p)->names->emplace_back(
-							obs_source_get_name(obs_sceneitem_get_source(child)));
-						return true;
-					},
-					param);
+	std::vector<std::pair<std::string, std::string>> items; /* name, uuid */
+	SourcePtr sceneSource = sourceByUuid(sceneUuid);
+	if (obs_scene_t *scene = sceneSource ? obs_scene_from_source(sceneSource.get()) : nullptr) {
+		forEachItem(scene, [&](obs_sceneitem_t *item) {
+			obs_source_t *src = obs_sceneitem_get_source(item);
+			const std::string uuid = obs_source_get_uuid(src);
+			for (const auto &existing : items)
+				if (existing.second == uuid)
+					return true; /* same source twice in a scene */
+			items.emplace_back(obs_source_get_name(src), uuid);
 			return true;
-		};
-		obs_scene_enum_items(scene, cb, &ctx);
+		});
 	}
 
-	bool found = !current || !*current;
-	for (const std::string &n : names) {
-		obs_property_list_add_string(list, n.c_str(), n.c_str());
-		found = found || n == current;
+	bool found = !currentUuid || !*currentUuid;
+	for (const auto &[name, uuid] : items) {
+		obs_property_list_add_string(list, name.c_str(), uuid.c_str());
+		found = found || uuid == currentUuid;
 	}
-	if (!found) {
-		const QString missing = T("Missing").arg(utf8(current));
-		const size_t idx = obs_property_list_add_string(list, missing.toUtf8().constData(), current);
-		obs_property_list_item_disable(list, idx, true);
-	}
+	if (!found)
+		addMissingItem(list, currentUuid);
 }
 
 class SourceVisibilityAction : public ActionType {
@@ -370,13 +384,13 @@ public:
 	obs_properties_t *properties(obs_data_t *settings) const override
 	{
 		obs_properties_t *props = obs_properties_create();
-		obs_property_t *scene = addSourceList(props, "scene", Tc("Scene"), SourceFilter::Scenes, settings);
-		obs_property_t *source = obs_properties_add_list(props, "source", Tc("Source"), OBS_COMBO_TYPE_LIST,
+		obs_property_t *scene = addSourceList(props, kScene, Tc("Scene"), SourceFilter::Scenes, settings);
+		obs_property_t *source = obs_properties_add_list(props, kSource, Tc("Source"), OBS_COMBO_TYPE_LIST,
 								 OBS_COMBO_FORMAT_STRING);
-		fillSceneItems(source, obs_data_get_string(settings, "scene"), obs_data_get_string(settings, "source"));
+		fillSceneItems(source, obs_data_get_string(settings, kScene), obs_data_get_string(settings, kSource));
 		obs_property_set_modified_callback(scene, [](obs_properties_t *ps, obs_property_t *, obs_data_t *s) {
-			fillSceneItems(obs_properties_get(ps, "source"), obs_data_get_string(s, "scene"),
-				       obs_data_get_string(s, "source"));
+			fillSceneItems(obs_properties_get(ps, kSource), obs_data_get_string(s, kScene),
+				       obs_data_get_string(s, kSource));
 			return true;
 		});
 		addModeList(props, Tc("Mode.Show"), Tc("Mode.Hide"));
@@ -399,47 +413,37 @@ public:
 	}
 	QString defaultLabel(obs_data_t *settings) const override
 	{
-		return utf8(obs_data_get_string(settings, "source"));
-	}
-	bool sourceRenamed(obs_data_t *settings, const SourceRename &r) const override
-	{
-		const bool a = renameKey(settings, "scene", r);
-		const bool b = renameKey(settings, "source", r);
-		return a || b;
+		return sourceNameByUuid(obs_data_get_string(settings, kSource));
 	}
 };
 
-void fillFilters(obs_property_t *list, const char *sourceName, const char *current)
+void fillFilters(obs_property_t *list, const char *sourceUuid, const char *currentUuid)
 {
 	obs_property_list_clear(list);
 	obs_property_list_add_string(list, "", "");
-	std::vector<std::string> names;
-	if (SourcePtr source = sourceByName(sourceName)) {
+	std::vector<std::pair<std::string, std::string>> filters; /* name, uuid */
+	if (SourcePtr source = sourceByUuid(sourceUuid)) {
 		obs_source_enum_filters(
 			source.get(),
 			[](obs_source_t *, obs_source_t *filter, void *p) {
-				static_cast<std::vector<std::string> *>(p)->emplace_back(obs_source_get_name(filter));
+				static_cast<std::vector<std::pair<std::string, std::string>> *>(p)->emplace_back(
+					obs_source_get_name(filter), obs_source_get_uuid(filter));
 			},
-			&names);
+			&filters);
 	}
-	bool found = !current || !*current;
-	for (const std::string &n : names) {
-		obs_property_list_add_string(list, n.c_str(), n.c_str());
-		found = found || n == current;
+	bool found = !currentUuid || !*currentUuid;
+	for (const auto &[name, uuid] : filters) {
+		obs_property_list_add_string(list, name.c_str(), uuid.c_str());
+		found = found || uuid == currentUuid;
 	}
-	if (!found) {
-		const QString missing = T("Missing").arg(utf8(current));
-		const size_t idx = obs_property_list_add_string(list, missing.toUtf8().constData(), current);
-		obs_property_list_item_disable(list, idx, true);
-	}
+	if (!found)
+		addMissingItem(list, currentUuid);
 }
 
 SourcePtr findFilter(obs_data_t *settings)
 {
-	SourcePtr source = sourceByName(obs_data_get_string(settings, "source"));
-	if (!source)
-		return nullptr;
-	return SourcePtr(obs_source_get_filter_by_name(source.get(), obs_data_get_string(settings, "filter")));
+	SourcePtr filter = sourceByUuid(obs_data_get_string(settings, kFilter));
+	return filter && obs_source_get_type(filter.get()) == OBS_SOURCE_TYPE_FILTER ? std::move(filter) : nullptr;
 }
 
 class FilterToggleAction : public ActionType {
@@ -451,13 +455,15 @@ public:
 	obs_properties_t *properties(obs_data_t *settings) const override
 	{
 		obs_properties_t *props = obs_properties_create();
-		obs_property_t *source = addSourceList(props, "source", Tc("Source"), SourceFilter::All, settings);
-		obs_property_t *filter = obs_properties_add_list(props, "filter", Tc("Filter"), OBS_COMBO_TYPE_LIST,
+		/* The source only narrows the filter list; the filter UUID alone
+		 * identifies the filter. */
+		obs_property_t *source = addSourceList(props, kSource, Tc("Source"), SourceFilter::All, settings);
+		obs_property_t *filter = obs_properties_add_list(props, kFilter, Tc("Filter"), OBS_COMBO_TYPE_LIST,
 								 OBS_COMBO_FORMAT_STRING);
-		fillFilters(filter, obs_data_get_string(settings, "source"), obs_data_get_string(settings, "filter"));
+		fillFilters(filter, obs_data_get_string(settings, kSource), obs_data_get_string(settings, kFilter));
 		obs_property_set_modified_callback(source, [](obs_properties_t *ps, obs_property_t *, obs_data_t *s) {
-			fillFilters(obs_properties_get(ps, "filter"), obs_data_get_string(s, "source"),
-				    obs_data_get_string(s, "filter"));
+			fillFilters(obs_properties_get(ps, kFilter), obs_data_get_string(s, kSource),
+				    obs_data_get_string(s, kFilter));
 			return true;
 		});
 		addModeList(props, Tc("Mode.Enable"), Tc("Mode.Disable"));
@@ -481,17 +487,7 @@ public:
 	}
 	QString defaultLabel(obs_data_t *settings) const override
 	{
-		return utf8(obs_data_get_string(settings, "filter"));
-	}
-	bool sourceRenamed(obs_data_t *settings, const SourceRename &r) const override
-	{
-		if (!r.isFilter)
-			return renameKey(settings, "source", r);
-		if (r.filterParent != utf8(obs_data_get_string(settings, "source")) ||
-		    r.oldName != utf8(obs_data_get_string(settings, "filter")))
-			return false;
-		obs_data_set_string(settings, "filter", r.newName.toUtf8().constData());
-		return true;
+		return sourceNameByUuid(obs_data_get_string(settings, kFilter));
 	}
 };
 
@@ -504,32 +500,28 @@ public:
 	obs_properties_t *properties(obs_data_t *settings) const override
 	{
 		obs_properties_t *props = obs_properties_create();
-		addSourceList(props, "source", Tc("Source"), SourceFilter::Audio, settings);
+		addSourceList(props, kSource, Tc("Source"), SourceFilter::Audio, settings);
 		addModeList(props, Tc("Mode.Mute"), Tc("Mode.Unmute"));
 		return props;
 	}
 	void defaults(obs_data_t *settings) const override { obs_data_set_default_string(settings, "mode", "toggle"); }
 	void execute(obs_data_t *settings) const override
 	{
-		if (SourcePtr s = sourceByName(obs_data_get_string(settings, "source")))
+		if (SourcePtr s = sourceByUuid(obs_data_get_string(settings, kSource)))
 			obs_source_set_muted(s.get(), applyMode(modeOf(settings), obs_source_muted(s.get())));
 	}
 	bool hasState() const override { return true; }
 	/* Lit while muted, like the mixer's mute indicator. */
 	control_panel_state state(obs_data_t *settings) const override
 	{
-		SourcePtr s = sourceByName(obs_data_get_string(settings, "source"));
+		SourcePtr s = sourceByUuid(obs_data_get_string(settings, kSource));
 		if (!s)
 			return CONTROL_PANEL_STATE_UNAVAILABLE;
 		return obs_source_muted(s.get()) ? CONTROL_PANEL_STATE_ON : CONTROL_PANEL_STATE_OFF;
 	}
 	QString defaultLabel(obs_data_t *settings) const override
 	{
-		return utf8(obs_data_get_string(settings, "source"));
-	}
-	bool sourceRenamed(obs_data_t *settings, const SourceRename &r) const override
-	{
-		return renameKey(settings, "source", r);
+		return sourceNameByUuid(obs_data_get_string(settings, kSource));
 	}
 };
 
@@ -542,7 +534,7 @@ public:
 	obs_properties_t *properties(obs_data_t *settings) const override
 	{
 		obs_properties_t *props = obs_properties_create();
-		addSourceList(props, "source", Tc("Source"), SourceFilter::Media, settings);
+		addSourceList(props, kSource, Tc("Source"), SourceFilter::Media, settings);
 		obs_property_t *c = obs_properties_add_list(props, "command", Tc("Media.Command"), OBS_COMBO_TYPE_LIST,
 							    OBS_COMBO_FORMAT_STRING);
 		obs_property_list_add_string(c, Tc("Media.PlayPause"), "play_pause");
@@ -558,7 +550,7 @@ public:
 	}
 	void execute(obs_data_t *settings) const override
 	{
-		SourcePtr s = sourceByName(obs_data_get_string(settings, "source"));
+		SourcePtr s = sourceByUuid(obs_data_get_string(settings, kSource));
 		if (!s)
 			return;
 		const char *cmd = obs_data_get_string(settings, "command");
@@ -584,7 +576,7 @@ public:
 	bool hasState() const override { return true; }
 	control_panel_state state(obs_data_t *settings) const override
 	{
-		SourcePtr s = sourceByName(obs_data_get_string(settings, "source"));
+		SourcePtr s = sourceByUuid(obs_data_get_string(settings, kSource));
 		if (!s)
 			return CONTROL_PANEL_STATE_UNAVAILABLE;
 		if (strcmp(obs_data_get_string(settings, "command"), "play_pause") != 0)
@@ -594,11 +586,7 @@ public:
 	}
 	QString defaultLabel(obs_data_t *settings) const override
 	{
-		return utf8(obs_data_get_string(settings, "source"));
-	}
-	bool sourceRenamed(obs_data_t *settings, const SourceRename &r) const override
-	{
-		return renameKey(settings, "source", r);
+		return sourceNameByUuid(obs_data_get_string(settings, kSource));
 	}
 };
 

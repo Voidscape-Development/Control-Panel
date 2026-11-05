@@ -19,8 +19,9 @@ now.
   a filter enabled, a source visible, a mic muted...) and dim with a red dot
   when their target is missing.
 - **Styling.** Panel-wide defaults and per-cell overrides for background,
-  text, active colors and font size, plus icons. Unstyled cells follow the
-  OBS theme.
+  text, active colors and font size. Unstyled cells follow the OBS theme.
+- **Icons.** A built-in icon set that follows the cell's colors, or your own
+  images.
 - **Per-collection panels.** Bind a panel to a scene collection and it only
   appears while that collection is loaded.
 - **Hotkeys.** Every panel gets "Show" and "Show in switcher" hotkeys, plus
@@ -55,9 +56,42 @@ now.
 outputs and other plugins), so anything you can bind a key to can go on a
 panel.
 
-Sources are referenced by name, so a panel works across scene collections that
-use the same names. Renaming a source or filter updates the panels that are
-active for the current collection.
+### Scenes and sources are referenced by UUID
+
+Scenes, sources, filters and source-owned hotkeys are stored by their OBS UUID,
+never by name, so renaming anything in OBS never breaks a button. Hotkeys
+owned by outputs, encoders or services, which have no UUID, use their
+internal object name, which users never see or change.
+
+OBS gives each scene collection its own UUIDs. A button that targets a
+specific scene or source therefore only works in the collection it was set
+up in; elsewhere it shows as unavailable (dimmed, red dot). Bind such panels
+to their scene collection. Panels made only of output controls (stream,
+record, replay buffer...) and status displays work everywhere.
+
+## Icons
+
+Buttons can show an icon above their label, or on its own with **Show label**
+turned off. Pick one in the cell inspector:
+
+- **Built-in icons**: 28 single-color icons that ship with the plugin
+  (record, stream, pause, replay, save, camera, mic, eye, filter, scene,
+  transition and more). They take on the cell's text color and switch to the
+  active text color when the button lights up. They are stored as
+  `builtin:<name>`, so panels using them can be exported and shared.
+- **Your own image**: PNG, JPG, SVG and others, drawn as-is. SVGs stay sharp
+  at any size. These are stored as file paths, so shared panels need the file
+  too.
+
+## Templates
+
+**Import / Export → Add from Template** in the editor adds a ready-made panel.
+**Streaming Essentials** has stream, record, pause, virtual camera, replay
+buffer, save replay, Studio Mode, transition and screenshot buttons with
+built-in icons, plus stream/record timers, a clock, CPU and FPS. It uses no
+scene or source references, so it works with any setup. The same panel is
+available as an importable file at
+[`examples/panels/streaming-essentials.json`](examples/panels/streaming-essentials.json).
 
 ## Where things are stored
 
@@ -128,8 +162,10 @@ src/model/                    panels, cells, grid math, storage (Qt Core only)
 src/core/                     OBS integration: type registry, built-in actions
                               and widgets, runtime, hotkeys, obs-websocket
 src/ui/                       docks, panel view, layout canvas, editor, inspector
+src/ui/icons/                 built-in icon set (SVG, compiled into the plugin)
 tests/                        unit tests for src/model
 examples/example-extension/   sample plugin adding an action and a widget type
+examples/panels/              importable example panels
 docs/API.md                   extension API guide
 ```
 

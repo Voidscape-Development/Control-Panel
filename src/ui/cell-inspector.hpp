@@ -67,6 +67,8 @@ private:
 	void applySuggestedLabel(bool force);
 	QString suggestedLabel() const;
 	QString actionText(int index) const;
+	void setIcon(const QString &ref);
+	void refreshIconButton();
 
 	Cell m_cell;
 	bool m_hasCell = false;
@@ -80,8 +82,7 @@ private:
 	QLineEdit *m_label;
 	QToolButton *m_suggest;
 	QCheckBox *m_showLabel;
-	QWidget *m_iconRow;
-	QLineEdit *m_icon;
+	QToolButton *m_icon;
 
 	ColorButton *m_bg;
 	ColorButton *m_fg;

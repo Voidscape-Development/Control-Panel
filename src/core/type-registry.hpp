@@ -32,14 +32,6 @@ class QWidget;
 
 namespace cp {
 
-/* Context passed to rename hooks so types can update stored references. */
-struct SourceRename {
-	QString oldName;
-	QString newName;
-	bool isFilter = false;
-	QString filterParent; /* name of the filter's parent source */
-};
-
 /* Something a button can do. Built-ins subclass this directly; plugin types
  * registered through the C API are wrapped by an adapter. */
 class ActionType {
@@ -59,9 +51,6 @@ public:
 	virtual bool hasState() const { return false; }
 	virtual control_panel_state state(obs_data_t *settings) const;
 	virtual QString defaultLabel(obs_data_t *settings) const;
-
-	/* Update stored source references. Returns true if settings changed. */
-	virtual bool sourceRenamed(obs_data_t *settings, const SourceRename &rename) const;
 
 	bool isExternal() const { return m_external; }
 
@@ -85,8 +74,6 @@ public:
 	virtual bool update(QWidget *widget, obs_data_t *settings) const;
 	virtual void tick(QWidget *widget, obs_data_t *settings) const;
 	virtual void destroy(QWidget *widget) const;
-
-	virtual bool sourceRenamed(obs_data_t *settings, const SourceRename &rename) const;
 
 	bool isExternal() const { return m_external; }
 

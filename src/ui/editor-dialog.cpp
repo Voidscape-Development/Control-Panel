@@ -124,6 +124,11 @@ EditorDialog::EditorDialog(QWidget *parent) : QDialog(parent)
 	ioMenu->addAction(T("Editor.Import"), this, &EditorDialog::importPanels);
 	ioMenu->addAction(T("Editor.ExportSelected"), this, [this]() { exportPanels(false); });
 	ioMenu->addAction(T("Editor.ExportAll"), this, [this]() { exportPanels(true); });
+	ioMenu->addSeparator();
+	QMenu *templates = ioMenu->addMenu(T("Editor.Templates"));
+	templates->addAction(T("Template.StreamingEssentials"), this, [this]() {
+		addTemplate(QStringLiteral(":/control-panel/templates/streaming-essentials.json"));
+	});
 	io->setMenu(ioMenu);
 	lbar->addWidget(add);
 	lbar->addWidget(dup);
@@ -524,10 +529,23 @@ void EditorDialog::reject()
 
 void EditorDialog::closeEvent(QCloseEvent *event)
 {
-	if (confirmDiscard())
-		event->accept();
-	else
-		event->ignore();
+	if (event->spontaneous()) {
+		/* The user closed the window: they can still change their mind. */
+		if (confirmDiscard())
+			event->accept();
+		else
+			event->ignore();
+		return;
+	}
+
+	/* Closed programmatically, i.e. OBS is shutting down. Cancelling can't
+	 * stop that, so only offer Save or Discard, and always close. */
+	if (m_dirty &&
+	    QMessageBox::question(this, T("Editor.Title"), T("Editor.UnsavedOnExit"),
+				  QMessageBox::Save | QMessageBox::Discard, QMessageBox::Save) == QMessageBox::Save)
+		apply();
+	m_dirty = false;
+	event->accept();
 }
 
 /* ---- panel list actions --------------------------------------------- */
@@ -593,6 +611,23 @@ void EditorDialog::importPanels()
 		QMessageBox::warning(this, T("Editor.Import"), T("Editor.ImportFailed").arg(error));
 		return;
 	}
+	const QList<Panel> prepared = PanelStore::prepareImport(parsed, m_working);
+	m_working.append(prepared);
+	refreshPanelList();
+	selectPanel(m_working.size() - prepared.size());
+	setDirty(true);
+}
+
+void EditorDialog::addTemplate(const QString &resource)
+{
+	QFile f(resource);
+	if (!f.open(QIODevice::ReadOnly))
+		return;
+	QString error;
+	const QList<Panel> parsed = PanelStore::parsePanels(f.readAll(), &error);
+	if (parsed.isEmpty())
+		return;
+	/* Fresh ids every time, so a template can be added more than once. */
 	const QList<Panel> prepared = PanelStore::prepareImport(parsed, m_working);
 	m_working.append(prepared);
 	refreshPanelList();

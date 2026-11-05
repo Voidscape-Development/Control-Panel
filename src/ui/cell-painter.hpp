@@ -43,12 +43,10 @@ struct ResolvedStyle {
 
 ResolvedStyle resolveStyle(const Cell &cell, const Theme &theme, const QPalette &palette);
 
-QPixmap loadIcon(const QString &path);
-
 struct CellVisual {
 	CellKind kind = CellKind::Button;
 	QString text;
-	QPixmap icon;
+	QString icon; /* reference, see icons.hpp */
 	ResolvedStyle style;
 };
 

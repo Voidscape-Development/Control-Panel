@@ -64,11 +64,22 @@ QJsonObject dataToJson(obs_data_t *data)
 	return json ? QJsonDocument::fromJson(QByteArray(json)).object() : QJsonObject();
 }
 
-SourcePtr sourceByName(const char *name)
+SourcePtr sourceByUuid(const char *uuid)
 {
-	if (!name || !*name)
+	if (!uuid || !*uuid)
 		return nullptr;
-	return SourcePtr(obs_get_source_by_name(name));
+	return SourcePtr(obs_get_source_by_uuid(uuid));
+}
+
+QString sourceUuid(const obs_source_t *source)
+{
+	return source ? utf8(obs_source_get_uuid(source)) : QString();
+}
+
+QString sourceNameByUuid(const char *uuid)
+{
+	SourcePtr s = sourceByUuid(uuid);
+	return s ? utf8(obs_source_get_name(s.get())) : QString();
 }
 
 QString currentSceneCollection()
@@ -112,18 +123,29 @@ bool matches(obs_source_t *source, SourceFilter filter)
 
 } // namespace
 
-void fillSourceList(obs_property_t *list, SourceFilter filter, const char *current)
+void addMissingItem(obs_property_t *list, const char *uuid)
 {
+	const QString missing = T("MissingSource").arg(utf8(uuid).left(8));
+	const size_t idx = obs_property_list_add_string(list, missing.toUtf8().constData(), uuid);
+	obs_property_list_item_disable(list, idx, true);
+}
+
+void fillSourceList(obs_property_t *list, SourceFilter filter, const char *currentUuid)
+{
+	struct Entry {
+		std::string name;
+		std::string uuid;
+	};
 	struct Ctx {
 		SourceFilter filter;
-		std::vector<std::string> names;
+		std::vector<Entry> entries;
 	} ctx{filter, {}};
 
 	auto collect = [](void *param, obs_source_t *source) {
 		auto *c = static_cast<Ctx *>(param);
 		const char *name = obs_source_get_name(source);
 		if (name && *name && matches(source, c->filter))
-			c->names.emplace_back(name);
+			c->entries.push_back({name, obs_source_get_uuid(source)});
 		return true;
 	};
 
@@ -132,23 +154,23 @@ void fillSourceList(obs_property_t *list, SourceFilter filter, const char *curre
 	if (filter == SourceFilter::Scenes || filter == SourceFilter::All)
 		obs_enum_scenes(collect, &ctx);
 
-	std::sort(ctx.names.begin(), ctx.names.end(), [](const std::string &a, const std::string &b) {
-		return QString::compare(QString::fromStdString(a), QString::fromStdString(b), Qt::CaseInsensitive) < 0;
+	std::sort(ctx.entries.begin(), ctx.entries.end(), [](const Entry &a, const Entry &b) {
+		return QString::compare(QString::fromStdString(a.name), QString::fromStdString(b.name),
+					Qt::CaseInsensitive) < 0;
 	});
-	ctx.names.erase(std::unique(ctx.names.begin(), ctx.names.end()), ctx.names.end());
+	ctx.entries.erase(std::unique(ctx.entries.begin(), ctx.entries.end(),
+				      [](const Entry &a, const Entry &b) { return a.uuid == b.uuid; }),
+			  ctx.entries.end());
 
 	obs_property_list_clear(list);
 	obs_property_list_add_string(list, "", "");
-	bool found = !current || !*current;
-	for (const std::string &n : ctx.names) {
-		obs_property_list_add_string(list, n.c_str(), n.c_str());
-		found = found || n == current;
+	bool found = !currentUuid || !*currentUuid;
+	for (const Entry &e : ctx.entries) {
+		obs_property_list_add_string(list, e.name.c_str(), e.uuid.c_str());
+		found = found || e.uuid == currentUuid;
 	}
-	if (!found) {
-		const QString missing = T("Missing").arg(utf8(current));
-		const size_t idx = obs_property_list_add_string(list, missing.toUtf8().constData(), current);
-		obs_property_list_item_disable(list, idx, true);
-	}
+	if (!found)
+		addMissingItem(list, currentUuid);
 }
 
 obs_property_t *addSourceList(obs_properties_t *props, const char *key, const char *desc, SourceFilter filter,

@@ -85,9 +85,6 @@ private:
 	Runtime();
 	~Runtime() override;
 
-	static void onSourceRename(void *data, calldata_t *cd);
-	void handleRename(const SourceRename &rename);
-
 	PanelStore m_store;
 	QString m_collection;
 	bool m_frontendReady = false;

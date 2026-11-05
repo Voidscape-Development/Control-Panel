@@ -47,10 +47,6 @@ QString ActionType::defaultLabel(obs_data_t *) const
 {
 	return {};
 }
-bool ActionType::sourceRenamed(obs_data_t *, const SourceRename &) const
-{
-	return false;
-}
 
 obs_properties_t *WidgetType::properties(obs_data_t *) const
 {
@@ -65,10 +61,6 @@ void WidgetType::tick(QWidget *, obs_data_t *) const {}
 void WidgetType::destroy(QWidget *widget) const
 {
 	delete widget;
-}
-bool WidgetType::sourceRenamed(obs_data_t *, const SourceRename &) const
-{
-	return false;
 }
 
 DataPtr settingsFor(const ActionType *type, const QJsonObject &json)

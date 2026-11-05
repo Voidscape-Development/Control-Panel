@@ -32,14 +32,6 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 namespace cp {
 namespace {
 
-bool renameSourceKey(obs_data_t *settings, const SourceRename &r)
-{
-	if (r.isFilter || utf8(obs_data_get_string(settings, "source")) != r.oldName)
-		return false;
-	obs_data_set_string(settings, "source", r.newName.toUtf8().constData());
-	return true;
-}
-
 /* ===================================================================== */
 /* Status display                                                        */
 /* ===================================================================== */
@@ -61,6 +53,12 @@ public:
 			l->setWordWrap(true);
 			l->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
 		}
+		/* Caption: one slightly smaller line, elided to fit (see
+		 * resizeEvent) rather than wrapped and clipped in small cells. */
+		m_caption->setWordWrap(false);
+		QFont cf = m_caption->font();
+		cf.setPointSizeF(cf.pointSizeF() * 0.85);
+		m_caption->setFont(cf);
 		QFont f = m_value->font();
 		f.setBold(true);
 		m_value->setFont(f);
@@ -81,7 +79,9 @@ public:
 		QString caption = QString::fromUtf8(obs_data_get_string(settings, "caption"));
 		if (caption.isEmpty())
 			caption = defaultCaption(m_kind);
-		m_caption->setText(caption);
+		m_captionText = caption;
+		updateCaption();
+		m_caption->setToolTip(caption);
 		m_caption->setVisible(obs_data_get_bool(settings, "show_caption") && !caption.isEmpty());
 		if (m_kind == QLatin1String("cpu") && !m_cpu)
 			m_cpu = os_cpu_usage_info_start();
@@ -93,6 +93,14 @@ public:
 
 	void refresh() { m_value->setText(valueText()); }
 
+protected:
+	void resizeEvent(QResizeEvent *event) override
+	{
+		QWidget::resizeEvent(event);
+		updateCaption();
+	}
+
+public:
 	static QString defaultCaption(const QString &kind)
 	{
 		static const QHash<QString, const char *> keys = {
@@ -153,7 +161,14 @@ private:
 		return QLocale().toString(QTime::currentTime(), QLocale::ShortFormat);
 	}
 
+	void updateCaption()
+	{
+		const int avail = std::max(0, width() - 8);
+		m_caption->setText(m_caption->fontMetrics().elidedText(m_captionText, Qt::ElideRight, avail));
+	}
+
 	QLabel *m_caption;
+	QString m_captionText;
 	QLabel *m_value;
 	QString m_kind;
 	os_cpu_usage_info_t *m_cpu = nullptr;
@@ -215,7 +230,7 @@ public:
 		const bool showMute = obs_data_get_bool(settings, "show_mute");
 		if (!m_slider || vertical != m_vertical || showMute != m_showMute)
 			buildUi(vertical, showMute);
-		attach(obs_data_get_string(settings, "source"));
+		attach(obs_data_get_string(settings, "source_uuid"));
 		sync();
 	}
 
@@ -282,13 +297,13 @@ private:
 		});
 	}
 
-	void attach(const char *name)
+	void attach(const char *uuid)
 	{
 		SourcePtr current = strongSource();
-		if (current && strcmp(obs_source_get_name(current.get()), name) == 0)
+		if (current && strcmp(obs_source_get_uuid(current.get()), uuid) == 0)
 			return;
 		detach();
-		SourcePtr source = sourceByName(name);
+		SourcePtr source = sourceByUuid(uuid);
 		if (!source)
 			return;
 		obs_fader_attach_source(m_fader, source.get());
@@ -320,7 +335,7 @@ public:
 	obs_properties_t *properties(obs_data_t *settings) const override
 	{
 		obs_properties_t *props = obs_properties_create();
-		addSourceList(props, "source", Tc("Source"), SourceFilter::Audio, settings);
+		addSourceList(props, "source_uuid", Tc("Source"), SourceFilter::Audio, settings);
 		obs_property_t *o = obs_properties_add_list(props, "orientation", Tc("Volume.Orientation"),
 							    OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
 		obs_property_list_add_string(o, Tc("Volume.Horizontal"), "horizontal");
@@ -345,10 +360,6 @@ public:
 		return true;
 	}
 	void tick(QWidget *widget, obs_data_t *) const override { static_cast<VolumeWidget *>(widget)->sync(); }
-	bool sourceRenamed(obs_data_t *settings, const SourceRename &r) const override
-	{
-		return renameSourceKey(settings, r);
-	}
 };
 
 } // namespace
