@@ -1,0 +1,264 @@
+{
+  "format": "obs-control-panel",
+  "version": 1,
+  "panels": [
+    {
+      "name": "Streaming Essentials",
+      "rows": 4,
+      "cols": 4,
+      "theme": {
+        "spacing": 6,
+        "cornerRadius": 8,
+        "style": {}
+      },
+      "collection": "",
+      "showAsDock": true,
+      "showInSwitcher": true,
+      "cells": [
+        {
+          "kind": "button",
+          "label": "Stream",
+          "icon": "builtin:stream",
+          "showLabel": true,
+          "row": 0,
+          "col": 0,
+          "rowSpan": 1,
+          "colSpan": 1,
+          "actions": [
+            {
+              "type": "stream",
+              "settings": {
+                "mode": "toggle"
+              }
+            }
+          ],
+          "indicator": -1,
+          "style": {
+            "activeBackground": "#ffd64541"
+          }
+        },
+        {
+          "kind": "button",
+          "label": "Record",
+          "icon": "builtin:record",
+          "showLabel": true,
+          "row": 0,
+          "col": 1,
+          "rowSpan": 1,
+          "colSpan": 1,
+          "actions": [
+            {
+              "type": "record",
+              "settings": {
+                "mode": "toggle"
+              }
+            }
+          ],
+          "indicator": -1,
+          "style": {
+            "activeBackground": "#ffd64541"
+          }
+        },
+        {
+          "kind": "button",
+          "label": "Pause",
+          "icon": "builtin:pause",
+          "showLabel": false,
+          "row": 0,
+          "col": 2,
+          "rowSpan": 1,
+          "colSpan": 1,
+          "actions": [
+            {
+              "type": "record_pause",
+              "settings": {
+                "mode": "toggle"
+              }
+            }
+          ],
+          "indicator": -1,
+          "style": {
+            "activeBackground": "#ffd99a2b"
+          }
+        },
+        {
+          "kind": "button",
+          "label": "Virtual Cam",
+          "icon": "builtin:camera",
+          "showLabel": true,
+          "row": 0,
+          "col": 3,
+          "rowSpan": 1,
+          "colSpan": 1,
+          "actions": [
+            {
+              "type": "virtualcam",
+              "settings": {
+                "mode": "toggle"
+              }
+            }
+          ],
+          "indicator": -1,
+          "style": {
+            "activeBackground": "#ff2e9e5b"
+          }
+        },
+        {
+          "kind": "button",
+          "label": "Replay Buffer",
+          "icon": "builtin:replay",
+          "showLabel": true,
+          "row": 1,
+          "col": 0,
+          "rowSpan": 1,
+          "colSpan": 1,
+          "actions": [
+            {
+              "type": "replay_buffer",
+              "settings": {
+                "mode": "toggle"
+              }
+            }
+          ],
+          "indicator": -1,
+          "style": {
+            "activeBackground": "#ff2e9e5b"
+          }
+        },
+        {
+          "kind": "button",
+          "label": "Save Replay",
+          "icon": "builtin:save",
+          "showLabel": true,
+          "row": 1,
+          "col": 1,
+          "rowSpan": 1,
+          "colSpan": 1,
+          "actions": [
+            {
+              "type": "replay_save",
+              "settings": {}
+            }
+          ],
+          "indicator": -1
+        },
+        {
+          "kind": "button",
+          "label": "Studio Mode",
+          "icon": "builtin:studio",
+          "showLabel": true,
+          "row": 1,
+          "col": 2,
+          "rowSpan": 1,
+          "colSpan": 1,
+          "actions": [
+            {
+              "type": "studio_mode",
+              "settings": {
+                "mode": "toggle"
+              }
+            }
+          ],
+          "indicator": -1,
+          "style": {
+            "activeBackground": "#ff3b73d9"
+          }
+        },
+        {
+          "kind": "button",
+          "label": "Transition",
+          "icon": "builtin:transition",
+          "showLabel": true,
+          "row": 1,
+          "col": 3,
+          "rowSpan": 1,
+          "colSpan": 1,
+          "actions": [
+            {
+              "type": "studio_transition",
+              "settings": {}
+            }
+          ],
+          "indicator": -1
+        },
+        {
+          "kind": "widget",
+          "widgetType": "status",
+          "widgetSettings": {
+            "kind": "stream_time"
+          },
+          "label": "",
+          "row": 2,
+          "col": 0,
+          "rowSpan": 1,
+          "colSpan": 1
+        },
+        {
+          "kind": "widget",
+          "widgetType": "status",
+          "widgetSettings": {
+            "kind": "record_time"
+          },
+          "label": "",
+          "row": 2,
+          "col": 1,
+          "rowSpan": 1,
+          "colSpan": 1
+        },
+        {
+          "kind": "button",
+          "label": "Screenshot",
+          "icon": "builtin:screenshot",
+          "showLabel": false,
+          "row": 2,
+          "col": 2,
+          "rowSpan": 1,
+          "colSpan": 1,
+          "actions": [
+            {
+              "type": "screenshot",
+              "settings": {}
+            }
+          ],
+          "indicator": -1
+        },
+        {
+          "kind": "widget",
+          "widgetType": "status",
+          "widgetSettings": {
+            "kind": "clock"
+          },
+          "label": "",
+          "row": 2,
+          "col": 3,
+          "rowSpan": 1,
+          "colSpan": 1
+        },
+        {
+          "kind": "widget",
+          "widgetType": "status",
+          "widgetSettings": {
+            "kind": "cpu"
+          },
+          "label": "",
+          "row": 3,
+          "col": 0,
+          "rowSpan": 1,
+          "colSpan": 2
+        },
+        {
+          "kind": "widget",
+          "widgetType": "status",
+          "widgetSettings": {
+            "kind": "fps"
+          },
+          "label": "",
+          "row": 3,
+          "col": 2,
+          "rowSpan": 1,
+          "colSpan": 2
+        }
+      ]
+    }
+  ]
+}

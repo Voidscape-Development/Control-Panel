@@ -1,0 +1,35 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+  <qresource prefix="/control-panel">
+    <file alias="templates/streaming-essentials.json">../../examples/panels/streaming-essentials.json</file>
+    <file alias="templates/streaming-essentials-material.json">../../examples/panels/streaming-essentials-material.json</file>
+    <file>icons/bell.svg</file>
+    <file>icons/bolt.svg</file>
+    <file>icons/camera.svg</file>
+    <file>icons/chat.svg</file>
+    <file>icons/clock.svg</file>
+    <file>icons/eye-off.svg</file>
+    <file>icons/eye.svg</file>
+    <file>icons/filter.svg</file>
+    <file>icons/flag.svg</file>
+    <file>icons/gear.svg</file>
+    <file>icons/heart.svg</file>
+    <file>icons/mic-off.svg</file>
+    <file>icons/mic.svg</file>
+    <file>icons/music.svg</file>
+    <file>icons/pause.svg</file>
+    <file>icons/play.svg</file>
+    <file>icons/record.svg</file>
+    <file>icons/replay.svg</file>
+    <file>icons/save.svg</file>
+    <file>icons/scene.svg</file>
+    <file>icons/screenshot.svg</file>
+    <file>icons/speaker-off.svg</file>
+    <file>icons/speaker.svg</file>
+    <file>icons/star.svg</file>
+    <file>icons/stop.svg</file>
+    <file>icons/stream.svg</file>
+    <file>icons/studio.svg</file>
+    <file>icons/transition.svg</file>
+  </qresource>
+</RCC>
